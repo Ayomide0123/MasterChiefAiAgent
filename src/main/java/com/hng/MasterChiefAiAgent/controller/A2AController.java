@@ -1,17 +1,10 @@
 package com.hng.MasterChiefAiAgent.controller;
 
 import com.hng.MasterChiefAiAgent.service.AIService;
-import lombok.Value;
-import org.json.JSONObject;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
-
-import java.time.Instant;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 public class A2AController {
@@ -23,8 +16,12 @@ public class A2AController {
     }
 
     @PostMapping("/generate-prd")
-    public ResponseEntity<String> generatePRD(@RequestBody String prompt) {
-        String prdText = aiService.generatePRD(prompt);
-        return ResponseEntity.ok(prdText);
+    public ResponseEntity<byte[]> generatePRD(@RequestBody String prompt) {
+        byte[] pdfBytes = aiService.generatePRDAsPDF(prompt);
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=prd.pdf")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdfBytes);
     }
 }

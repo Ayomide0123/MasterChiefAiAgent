@@ -9,6 +9,7 @@ import com.itextpdf.layout.element.Paragraph;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
+import java.util.Base64;
 
 @Service
 public class AIService {
@@ -16,13 +17,12 @@ public class AIService {
     private final Client client;
 
     public AIService() {
-        // Initialize Gemini client (reads API key from environment variable automatically)
         this.client = new Client();
     }
 
-    public byte[] generatePRDAsPDF(String prompt) {
+    public String generatePRDPdfBase64(String prompt) {
         try {
-            // Step 1: Ask Gemini to generate text
+            // Generate text from Gemini
             GenerateContentResponse response = client.models.generateContent(
                     "gemini-2.0-flash",
                     prompt,
@@ -31,24 +31,28 @@ public class AIService {
 
             String generatedText = response.text();
 
-            // Convert generated text to a PDF
+            // Create PDF in memory
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             PdfWriter writer = new PdfWriter(baos);
             PdfDocument pdf = new PdfDocument(writer);
             Document document = new Document(pdf);
 
-            document.add(new Paragraph("Product Requirements Document (PRD)").setBold().setFontSize(16));
+            document.add(new Paragraph("Product Requirements Document (PRD)")
+                    .setBold()
+                    .setFontSize(16));
             document.add(new Paragraph("\n"));
             document.add(new Paragraph(generatedText));
 
             document.close();
 
-            // Step 3: Return PDF bytes
-            return baos.toByteArray();
+            // Convert PDF to Base64
+            return Base64.getEncoder().encodeToString(baos.toByteArray());
 
         } catch (Exception e) {
             e.printStackTrace();
-            return ("Error generating PRD: " + e.getMessage()).getBytes();
+            return Base64.getEncoder().encodeToString(
+                    ("Error generating PRD: " + e.getMessage()).getBytes()
+            );
         }
     }
 }

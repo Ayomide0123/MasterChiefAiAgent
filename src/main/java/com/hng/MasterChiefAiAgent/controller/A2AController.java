@@ -16,32 +16,30 @@ public class A2AController {
         this.aiService = aiService;
     }
 
-    @PostMapping
+    @PostMapping("/agent/prdAgent")
     public String handleA2ARequest(@RequestBody String requestBody) {
         try {
             JSONObject request = new JSONObject(requestBody);
 
-            // Extract fields from A2A request
+            // Extract key request data
             String id = request.getString("id");
             JSONObject params = request.getJSONObject("params");
             JSONObject message = params.getJSONObject("message");
-            String userPrompt = message
-                    .getJSONArray("parts")
-                    .getJSONObject(0)
-                    .getString("text");
+            String userPrompt = message.getJSONArray("parts").getJSONObject(0).getString("text");
 
-            // Generate PDF (as Base64)
+            // Generate PDF as Base64
             String base64Pdf = aiService.generatePRDPdfBase64(userPrompt);
 
-            // Build A2A response
+            // Build response
             JSONObject response = new JSONObject();
             response.put("jsonrpc", "2.0");
             response.put("id", id);
 
             JSONObject result = new JSONObject();
-            result.put("id", message.getString("taskId"));
+            result.put("id", "task-" + UUID.randomUUID());
             result.put("contextId", UUID.randomUUID().toString());
 
+            // ----- STATUS -----
             JSONObject status = new JSONObject();
             status.put("state", "completed");
             status.put("timestamp", Instant.now().toString());
@@ -49,30 +47,48 @@ public class A2AController {
             JSONObject agentMessage = new JSONObject();
             agentMessage.put("messageId", "msg-" + UUID.randomUUID());
             agentMessage.put("role", "agent");
+            agentMessage.put("kind", "message");
 
             JSONObject textPart = new JSONObject();
             textPart.put("kind", "text");
             textPart.put("text", "Your PRD document has been generated successfully.");
 
             agentMessage.put("parts", new org.json.JSONArray().put(textPart));
-            agentMessage.put("kind", "message");
             status.put("message", agentMessage);
+            result.put("status", status);
 
-            // Add artifacts (Base64-encoded PDF)
-            JSONObject artifact = new JSONObject();
-            artifact.put("artifactId", UUID.randomUUID().toString());
-            artifact.put("name", "prdDocument");
+            // ----- ARTIFACT 1: Text summary -----
+            JSONObject artifactText = new JSONObject();
+            artifactText.put("artifactId", "artifact-" + UUID.randomUUID());
+            artifactText.put("name", "prdAgentResponse");
+
+            JSONObject textArtifactPart = new JSONObject();
+            textArtifactPart.put("kind", "text");
+            textArtifactPart.put("text", "Your PRD document has been generated successfully and is attached as Base64 data.");
+
+            artifactText.put("parts", new org.json.JSONArray().put(textArtifactPart));
+
+            // ----- ARTIFACT 2: PDF (Base64 data) -----
+            JSONObject artifactData = new JSONObject();
+            artifactData.put("artifactId", "artifact-" + UUID.randomUUID());
+            artifactData.put("name", "PRDDocument");
 
             JSONObject dataPart = new JSONObject();
             dataPart.put("kind", "data");
             dataPart.put("data", base64Pdf);
 
-            artifact.put("parts", new org.json.JSONArray().put(dataPart));
+            artifactData.put("parts", new org.json.JSONArray().put(dataPart));
 
-            result.put("status", status);
-            result.put("artifacts", new org.json.JSONArray().put(artifact));
-            result.put("kind", "task");
+            // ----- Add both artifacts -----
+            result.put("artifacts", new org.json.JSONArray()
+                    .put(artifactText)
+                    .put(artifactData)
+            );
 
+            // Optional: maintain a history array (even if empty)
+            result.put("history", new org.json.JSONArray());
+
+            // Attach to response
             response.put("result", result);
 
             return response.toString(2); // pretty print

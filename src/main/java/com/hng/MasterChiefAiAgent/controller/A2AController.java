@@ -54,9 +54,6 @@ public class A2AController {
             // Get secure URL
             String fileUrl = (String) uploadResult.get("secure_url");
 
-
-
-
             // Generate unique filename
             String filename = "prd-" + UUID.randomUUID() + ".pdf";
 

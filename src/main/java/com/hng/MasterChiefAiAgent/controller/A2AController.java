@@ -1,5 +1,7 @@
 package com.hng.MasterChiefAiAgent.controller;
 
+import com.cloudinary.Cloudinary;
+import com.cloudinary.utils.ObjectUtils;
 import com.hng.MasterChiefAiAgent.service.AIService;
 import org.springframework.web.bind.annotation.*;
 import org.json.JSONObject;
@@ -7,6 +9,7 @@ import java.io.FileOutputStream;
 import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -14,9 +17,11 @@ import java.util.UUID;
 public class A2AController {
 
     private final AIService aiService;
+    private final Cloudinary cloudinary;
 
-    public A2AController(AIService aiService) {
+    public A2AController(AIService aiService, Cloudinary cloudinary) {
         this.aiService = aiService;
+        this.cloudinary = cloudinary;
     }
 
     @PostMapping("/agent/prdAgent")
@@ -36,17 +41,34 @@ public class A2AController {
             // Decode Base64 to bytes
             byte[] pdfBytes = Base64.getDecoder().decode(base64Pdf);
 
+
+            // Upload to Cloudinary
+            Map uploadResult = cloudinary.uploader().upload(
+                    pdfBytes,
+                    ObjectUtils.asMap(
+                            "resource_type", "raw",  // important for non-image files
+                            "public_id", "prd_" + UUID.randomUUID()
+                    )
+            );
+
+            // Get secure URL
+            String fileUrl = (String) uploadResult.get("secure_url");
+
+
+
+
             // Generate unique filename
             String filename = "prd-" + UUID.randomUUID() + ".pdf";
-            String filePath = Paths.get("src/main/resources/static/files", filename).toString();
 
-            // Save PDF to static folder
-            try (FileOutputStream fos = new FileOutputStream(filePath)) {
-                fos.write(pdfBytes);
-            }
-
-            // The public file URL (adjust domain if deployed)
-            String fileUrl = "http://localhost:8080/files/" + filename;
+//            String filePath = Paths.get("src/main/resources/static/files", filename).toString();
+//
+//            // Save PDF to static folder
+//            try (FileOutputStream fos = new FileOutputStream(filePath)) {
+//                fos.write(pdfBytes);
+//            }
+//
+//            // The public file URL (adjust domain if deployed)
+//            String fileUrl = "http://localhost:8080/files/" + filename;
 
             // Build JSON-RPC response for Telex
             JSONObject response = new JSONObject();

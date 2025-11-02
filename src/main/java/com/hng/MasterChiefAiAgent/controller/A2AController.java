@@ -331,14 +331,11 @@ public class A2AController {
     private ObjectNode buildCompletedResponse(String taskId, String contextId, String fileUrl, String userPrompt) {
         String messageId = "msg-" + UUID.randomUUID();
         String artifactId = "artifact-" + UUID.randomUUID();
-        String userMessageId = "msg-" + UUID.randomUUID();
 
         // 🔹 Build text part
         ObjectNode textPart = objectMapper.createObjectNode();
         textPart.put("kind", "text");
         textPart.put("text", "📄 Your PRD has been generated successfully! Click below to download it:");
-        textPart.putNull("data");
-        textPart.putNull("file_url");
 
         // 🔹 Build file part
         ObjectNode filePart = objectMapper.createObjectNode();
@@ -346,91 +343,52 @@ public class A2AController {
         filePart.put("file_url", fileUrl);
         filePart.put("file_name", "Product_Requirement_Document.pdf");
         filePart.put("mime_type", "application/pdf");
-        filePart.putNull("data");
 
-        // 🔹 Build message parts array
-        ArrayNode messageParts = objectMapper.createArrayNode();
-        messageParts.add(textPart);
-        messageParts.add(filePart);
+        // 🔹 Build parts array
+        ArrayNode parts = objectMapper.createArrayNode();
+        parts.add(textPart);
+        parts.add(filePart);
 
-        // 🔹 Build message object
-        ObjectNode messageObj = objectMapper.createObjectNode();
-        messageObj.put("kind", "message");
-        messageObj.put("role", "agent");
-        messageObj.set("parts", messageParts);
-        messageObj.put("messageId", messageId);
-        messageObj.put("taskId", taskId);
-        messageObj.putNull("metadata");
+        // 🔹 Build message
+        ObjectNode message = objectMapper.createObjectNode();
+        message.put("kind", "message");
+        message.put("role", "agent");
+        message.set("parts", parts);
+        message.put("messageId", messageId);
 
-        // 🔹 Build status object
-        ObjectNode statusObj = objectMapper.createObjectNode();
-        statusObj.put("state", "completed");
-        statusObj.put("timestamp", Instant.now().toString());
-        statusObj.set("message", messageObj);
+        // 🔹 Build task result
+        ObjectNode task = objectMapper.createObjectNode();
+        task.put("id", taskId);
+        task.put("contextId", contextId);
+        task.put("kind", "task");
 
-        // 🔹 Build artifact parts array
-        ArrayNode artifactParts = objectMapper.createArrayNode();
-        artifactParts.add(filePart);
+        ObjectNode status = objectMapper.createObjectNode();
+        status.put("state", "completed");
+        status.put("timestamp", Instant.now().toString());
+        status.set("message", message);
+        task.set("status", status);
 
-        // 🔹 Build artifact object
-        ObjectNode artifactObj = objectMapper.createObjectNode();
-        artifactObj.put("artifactId", artifactId);
-        artifactObj.put("name", "PRDDocument");
-        artifactObj.set("parts", artifactParts);
+        // 🔹 Build artifacts
+        ObjectNode artifact = objectMapper.createObjectNode();
+        artifact.put("artifactId", artifactId);
+        artifact.put("name", "PRDDocument");
+        artifact.set("parts", objectMapper.createArrayNode().add(filePart));
 
-        // 🔹 Build artifacts array
-        ArrayNode artifacts = objectMapper.createArrayNode();
-        artifacts.add(artifactObj);
+        task.set("artifacts", objectMapper.createArrayNode().add(artifact));
+        task.set("history", objectMapper.createArrayNode());
 
-        // 🔹 Build user history message
-        ObjectNode userTextPart = objectMapper.createObjectNode();
-        userTextPart.put("kind", "text");
-        userTextPart.put("text", userPrompt);
-        userTextPart.putNull("data");
-        userTextPart.putNull("file_url");
+        // 🔹 Build params object
+        ObjectNode params = objectMapper.createObjectNode();
+        params.set("task", task);
 
-        ArrayNode userParts = objectMapper.createArrayNode();
-        userParts.add(userTextPart);
+        // 🔹 Build webhook payload
+        ObjectNode webhookPayload = objectMapper.createObjectNode();
+        webhookPayload.put("jsonrpc", "2.0");
+        webhookPayload.put("id", taskId);
+        webhookPayload.put("method", "message/send");
+        webhookPayload.set("params", params);
 
-        ObjectNode userHistoryMessage = objectMapper.createObjectNode();
-        userHistoryMessage.put("kind", "message");
-        userHistoryMessage.put("role", "user");
-        userHistoryMessage.set("parts", userParts);
-        userHistoryMessage.put("messageId", userMessageId);
-        userHistoryMessage.putNull("taskId");
-        userHistoryMessage.putNull("metadata");
-
-        // 🔹 Build agent history message
-        ObjectNode agentHistoryMessage = objectMapper.createObjectNode();
-        agentHistoryMessage.put("kind", "message");
-        agentHistoryMessage.put("role", "agent");
-        agentHistoryMessage.set("parts", messageParts);
-        agentHistoryMessage.put("messageId", messageId);
-        agentHistoryMessage.put("taskId", taskId);
-        agentHistoryMessage.putNull("metadata");
-
-        // 🔹 Build history array
-        ArrayNode history = objectMapper.createArrayNode();
-        history.add(userHistoryMessage);
-        history.add(agentHistoryMessage);
-
-        // 🔹 Build result object
-        ObjectNode result = objectMapper.createObjectNode();
-        result.put("id", taskId);
-        result.put("contextId", contextId);
-        result.set("status", statusObj);
-        result.set("artifacts", artifacts);
-        result.set("history", history);
-        result.put("kind", "task");
-
-        // 🔹 Build final response (for webhook, no top-level wrapper needed)
-        ObjectNode response = objectMapper.createObjectNode();
-        response.put("jsonrpc", "2.0");
-        response.put("id", taskId);
-        response.set("result", result);
-        response.putNull("error");
-
-        return response;
+        return webhookPayload;
     }
 
     private void sendWebhookNotification(String url, String token, ObjectNode payload) {
@@ -471,11 +429,15 @@ public class A2AController {
         errorObj.put("code", -32603);
         errorObj.put("message", "Failed to process request: " + error.getMessage());
 
+        ObjectNode params = objectMapper.createObjectNode();
+        params.putNull("result");
+        params.set("error", errorObj);
+
         ObjectNode response = objectMapper.createObjectNode();
         response.put("jsonrpc", "2.0");
         response.put("id", taskId);
-        response.putNull("result");
-        response.set("error", errorObj);
+        response.put("method", "message/send");  // ✅ Add method
+        response.set("params", params);           // ✅ Wrap in params
 
         return response;
     }

@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.hng.MasterChiefAiAgent.service.AIService;
-import org.json.JSONArray;
 import org.springframework.web.bind.annotation.*;
 import org.json.JSONObject;
 import java.time.Instant;
@@ -37,45 +36,9 @@ public class A2AController {
 
             JSONObject params = request.getJSONObject("params");
             JSONObject message = params.getJSONObject("message");
-            // Extract user prompt - handle nested data structure
-            String userPrompt = "";
-            JSONArray parts = message.getJSONArray("parts");
-
-            for (int i = 0; i < parts.length(); i++) {
-                JSONObject part = parts.getJSONObject(i);
-
-                // Check if it's a direct text part with content
-                if (part.getString("kind").equals("text") &&
-                        part.has("text") &&
-                        !part.getString("text").isEmpty()) {
-                    userPrompt = part.getString("text");
-                    break;
-                }
-
-                // Check if it's a data part containing nested text
-                if (part.getString("kind").equals("data") && part.has("data")) {
-                    JSONArray dataArray = part.getJSONArray("data");
-                    // Get the last text item (most recent user message)
-                    for (int j = dataArray.length() - 1; j >= 0; j--) {
-                        JSONObject dataItem = dataArray.getJSONObject(j);
-                        if (dataItem.getString("kind").equals("text") &&
-                                dataItem.has("text") &&
-                                !dataItem.getString("text").isEmpty()) {
-                            String text = dataItem.getString("text");
-                            // Skip HTML tags and empty content
-                            if (!text.matches("<p>.*</p>") || text.contains("prd")) {
-                                userPrompt = text.replaceAll("<[^>]*>", "").trim();
-                                break;
-                            }
-                        }
-                    }
-                    if (!userPrompt.isEmpty()) break;
-                }
-            }
-
-            if (userPrompt.isEmpty()) {
-                throw new IllegalArgumentException("No valid user prompt found in request");
-            }
+            String userPrompt = message.getJSONArray("parts")
+                    .getJSONObject(0)
+                    .getString("text");
 
             // 🔹 Generate PDF as Base64
             String base64Pdf = aiService.generatePRDPdfBase64(userPrompt);

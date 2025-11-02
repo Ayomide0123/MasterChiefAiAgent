@@ -3,7 +3,10 @@ package com.hng.MasterChiefAiAgent.controller;
 import com.hng.MasterChiefAiAgent.service.AIService;
 import org.springframework.web.bind.annotation.*;
 import org.json.JSONObject;
+import java.io.FileOutputStream;
+import java.nio.file.Paths;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.UUID;
 
 @RestController
@@ -21,23 +24,40 @@ public class A2AController {
         try {
             JSONObject request = new JSONObject(requestBody);
 
-            // Extract key request data
-            String id = request.getString("id");
+            // Extract essentials
+            String id = request.optString("id", UUID.randomUUID().toString());
             JSONObject params = request.getJSONObject("params");
             JSONObject message = params.getJSONObject("message");
             String userPrompt = message.getJSONArray("parts").getJSONObject(0).getString("text");
 
-            // Generate PDF as Base64
+            // Generate PRD PDF as Base64
             String base64Pdf = aiService.generatePRDPdfBase64(userPrompt);
 
-            // Build response
+            // Decode Base64 to bytes
+            byte[] pdfBytes = Base64.getDecoder().decode(base64Pdf);
+
+            // Generate unique filename
+            String filename = "prd-" + UUID.randomUUID() + ".pdf";
+            String filePath = Paths.get("src/main/resources/static/files", filename).toString();
+
+            // Save PDF to static folder
+            try (FileOutputStream fos = new FileOutputStream(filePath)) {
+                fos.write(pdfBytes);
+            }
+
+            // The public file URL (adjust domain if deployed)
+            String fileUrl = "http://localhost:8080/files/" + filename;
+
+            // Build JSON-RPC response for Telex
             JSONObject response = new JSONObject();
             response.put("jsonrpc", "2.0");
             response.put("id", id);
 
             JSONObject result = new JSONObject();
-            result.put("id", "task-" + UUID.randomUUID());
-            result.put("contextId", UUID.randomUUID().toString());
+            String taskId = "task-" + UUID.randomUUID();
+            String contextId = "ctx-" + UUID.randomUUID();
+            result.put("id", taskId);
+            result.put("contextId", contextId);
 
             // ----- STATUS -----
             JSONObject status = new JSONObject();
@@ -48,50 +68,53 @@ public class A2AController {
             agentMessage.put("messageId", "msg-" + UUID.randomUUID());
             agentMessage.put("role", "agent");
             agentMessage.put("kind", "message");
+            agentMessage.put("taskId", taskId);
 
+            org.json.JSONArray messageParts = new org.json.JSONArray();
             JSONObject textPart = new JSONObject();
             textPart.put("kind", "text");
-            textPart.put("text", "Your PRD document has been generated successfully.");
+            textPart.put("text", "Here is your PRD document. You can download it below 👇");
 
-            agentMessage.put("parts", new org.json.JSONArray().put(textPart));
+            JSONObject filePart = new JSONObject();
+            filePart.put("kind", "file");
+            filePart.put("file_url", fileUrl);
+
+            messageParts.put(textPart);
+            messageParts.put(filePart);
+            agentMessage.put("parts", messageParts);
+
             status.put("message", agentMessage);
             result.put("status", status);
 
-            // ----- ARTIFACT 1: Text summary -----
+            // ----- ARTIFACTS -----
+            org.json.JSONArray artifacts = new org.json.JSONArray();
+
             JSONObject artifactText = new JSONObject();
             artifactText.put("artifactId", "artifact-" + UUID.randomUUID());
             artifactText.put("name", "prdAgentResponse");
+            artifactText.put("parts", new org.json.JSONArray()
+                    .put(new JSONObject()
+                            .put("kind", "text")
+                            .put("text", "The PRD has been generated successfully.")));
 
-            JSONObject textArtifactPart = new JSONObject();
-            textArtifactPart.put("kind", "text");
-            textArtifactPart.put("text", "Your PRD document has been generated successfully and is attached as Base64 data.");
+            JSONObject artifactFile = new JSONObject();
+            artifactFile.put("artifactId", "artifact-" + UUID.randomUUID());
+            artifactFile.put("name", "PRDDocument");
+            artifactFile.put("parts", new org.json.JSONArray()
+                    .put(new JSONObject()
+                            .put("kind", "file")
+                            .put("file_url", fileUrl)));
 
-            artifactText.put("parts", new org.json.JSONArray().put(textArtifactPart));
+            artifacts.put(artifactText);
+            artifacts.put(artifactFile);
 
-            // ----- ARTIFACT 2: PDF (Base64 data) -----
-            JSONObject artifactData = new JSONObject();
-            artifactData.put("artifactId", "artifact-" + UUID.randomUUID());
-            artifactData.put("name", "PRDDocument");
-
-            JSONObject dataPart = new JSONObject();
-            dataPart.put("kind", "data");
-            dataPart.put("data", base64Pdf);
-
-            artifactData.put("parts", new org.json.JSONArray().put(dataPart));
-
-            // ----- Add both artifacts -----
-            result.put("artifacts", new org.json.JSONArray()
-                    .put(artifactText)
-                    .put(artifactData)
-            );
-
-            // Optional: maintain a history array (even if empty)
+            result.put("artifacts", artifacts);
             result.put("history", new org.json.JSONArray());
+            result.put("kind", "task");
 
-            // Attach to response
             response.put("result", result);
 
-            return response.toString(2); // pretty print
+            return response.toString(2);
 
         } catch (Exception e) {
             JSONObject errorResponse = new JSONObject();

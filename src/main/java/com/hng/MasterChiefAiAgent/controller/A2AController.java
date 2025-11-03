@@ -46,27 +46,27 @@ public class A2AController {
             requestId = request.optString("id", requestId);
 
             // Validate request structure
-            if (!request.has("params")) {
-                return buildErrorResponse(requestId, -32602, "Missing 'params' in request");
-            }
+//            if (!request.has("params")) {
+//                return buildErrorResponse(requestId, -32602, "Missing 'params' in request");
+//            }
 
             JSONObject params = request.getJSONObject("params");
-            if (!params.has("message")) {
-                return buildErrorResponse(requestId, -32602, "Missing 'message' in params");
-            }
+//            if (!params.has("message")) {
+//                return buildErrorResponse(requestId, -32602, "Missing 'message' in params");
+//            }
 
             JSONObject message = params.getJSONObject("message");
-            if (!message.has("parts") || message.getJSONArray("parts").length() == 0) {
-                return buildErrorResponse(requestId, -32602, "Missing or empty 'parts' in message");
-            }
+//            if (!message.has("parts") || message.getJSONArray("parts").length() == 0) {
+//                return buildErrorResponse(requestId, -32602, "Missing or empty 'parts' in message");
+//            }
 
             String userPrompt = message.getJSONArray("parts")
                     .getJSONObject(0)
                     .getString("text");
 
-            if (userPrompt == null || userPrompt.trim().isEmpty()) {
-                return buildErrorResponse(requestId, -32602, "Empty user prompt");
-            }
+//            if (userPrompt == null || userPrompt.trim().isEmpty()) {
+//                return buildErrorResponse(requestId, -32602, "Empty user prompt");
+//            }
 
             // Generate PDF
             String base64Pdf;

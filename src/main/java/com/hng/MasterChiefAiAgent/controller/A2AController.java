@@ -70,22 +70,22 @@ public class A2AController {
             // 🔹 Build text part (kind → text → data → file_url)
             ObjectNode textPart = objectMapper.createObjectNode();
             textPart.put("kind", "text");
-            textPart.put("text", "📄 Your PRD has been generated successfully! Click below to download it:" + fileUrl);
+            textPart.put("text", "📄 Your PRD has been generated successfully! Click below to download it:");
             textPart.putNull("data");
-            textPart.put("file_url", fileUrl);
+            textPart.putNull("file_url");
 
             // 🔹 Build file part (kind → file_url → file_name → mime_type → data)
-//            ObjectNode filePart = objectMapper.createObjectNode();
-//            filePart.put("kind", "file");
-//            filePart.put("file_url", fileUrl);
-//            filePart.put("file_name", "Product_Requirement_Document.pdf");
-//            filePart.put("mime_type", "application/pdf");
-//            filePart.putNull("data");
+            ObjectNode filePart = objectMapper.createObjectNode();
+            filePart.put("kind", "file");
+            filePart.put("file_url", fileUrl);
+            filePart.put("file_name", "Product_Requirement_Document.pdf");
+            filePart.put("mime_type", "application/pdf");
+            filePart.putNull("data");
 
             // 🔹 Build parts array
             ArrayNode messageParts = objectMapper.createArrayNode();
             messageParts.add(textPart);
-//            messageParts.add(filePart);
+            messageParts.add(filePart);
 
             // 🔹 Build message object (kind → role → parts → messageId → taskId → metadata)
             ObjectNode messageObj = objectMapper.createObjectNode();
@@ -104,8 +104,7 @@ public class A2AController {
 
             // 🔹 Build artifact parts array
             ArrayNode artifactParts = objectMapper.createArrayNode();
-              artifactParts.add(textPart);
-//            artifactParts.add(filePart);
+            artifactParts.add(filePart);
 
             // 🔹 Build artifact object (artifactId → name → parts)
             ObjectNode artifactObj = objectMapper.createObjectNode();
